@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-algorithmique"
+version = "0.1.0"
+description = "Pipeline de trading algorithmique (data, features, backtesting, risk, ingestion MT5)"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas",
+  "numpy",
+  "matplotlib",
+  "pyyaml",
+  "pytest",
+  "MetaTrader5",
+  "pytz"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

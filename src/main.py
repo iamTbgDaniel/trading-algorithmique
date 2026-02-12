@@ -2,8 +2,11 @@ import matplotlib.pyplot as plt
 
 from src.trading.utils.config import load_config
 from src.trading.data.loader import load_csv
+
 from src.trading.features.indicators import add_moving_average
-from src.trading.backtesting.engine import run_backtest
+from src.trading.features.volatility import add_atr
+
+from src.trading.backtesting.engine import run_backtest_atr_sl_tp
 from src.trading.evaluation.metrics import summarize
 from src.trading.risk.manager import enforce_risk_limits
 
@@ -18,14 +21,17 @@ def main():
     # 1) Charger données MT5 (M5)
     df = load_csv(cfg["data_path"])
 
-    # 2) Feature d’exécution sur M5
+    # 2) Features d’exécution sur M5
     exec_ma_window = cfg["features"]["ma_window"]
     df = add_moving_average(df, exec_ma_window)
+
+    atr_window = cfg["execution"]["atr_window"]
+    df = add_atr(df, atr_window)
 
     # 3) Multi-timeframe : H4 -> H1 -> M30 -> M15 (filtre), exécution M5
     context_filter = None
     if cfg.get("multi_tf", {}).get("enabled", False):
-        rules = cfg["multi_tf"]["rules"]                 # ["4H","1H","30min","15min"]
+        rules = cfg["multi_tf"]["rules"]                 # ["4h","1h","30min","15min"]
         context_ma = cfg["multi_tf"]["context_ma_window"]
 
         combined = None
@@ -42,8 +48,8 @@ def main():
     if context_filter is not None:
         print("context_filter (10 dernières):", context_filter.tail(10).tolist())
 
-    # 4) Backtest
-    df = run_backtest(
+    # 4) Backtest ATR SL/TP (1 position à la fois)
+    df = run_backtest_atr_sl_tp(
         df,
         initial_capital=cfg["backtest"]["initial_capital"],
         commission_per_trade=cfg["backtest"]["commission_per_trade"],
@@ -51,13 +57,19 @@ def main():
         spread_bps=cfg["backtest"]["spread_bps"],
         context_filter=context_filter,
         exec_ma_window=exec_ma_window,
+        atr_window=atr_window,
+        sl_atr=cfg["execution"]["sl_atr"],
+        tp_atr=cfg["execution"]["tp_atr"],
+        cooldown_bars=cfg["execution"]["cooldown_bars"],
     )
+
     print("Nombre de trades (proxy):", int(df["position"].diff().abs().fillna(0).sum()))
     print("Proportion context_ok=1:", float(df["context_ok"].mean()))
 
-    # Debug cohérent (ma dynamique)
+    # Debug cohérent (MA + ATR)
     ma_col = f"ma_{exec_ma_window}"
-    print(df[["close", ma_col, "context_ok", "position"]].head(10))
+    atr_col = f"atr_{atr_window}"
+    print(df[["close", ma_col, atr_col, "context_ok", "position"]].head(20))
 
     # 5) Stats
     stats = summarize(df)
@@ -77,7 +89,7 @@ def main():
 
     # 7) Plot
     plt.plot(df["equity"])
-    plt.title("Equity Curve")
+    plt.title("Equity Curve (ATR SL/TP)")
     plt.show()
 
 

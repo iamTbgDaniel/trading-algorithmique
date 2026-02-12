@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+src/trading/__init__.py
+src/trading/backtesting/engine.py
+src/trading/data/loader.py
+src/trading/data/resample.py
+src/trading/evaluation/metrics.py
+src/trading/features/indicators.py
+src/trading/features/regime.py
+src/trading/ingestion/mt5_fetch.py
+src/trading/risk/manager.py
+src/trading/utils/config.py
+src/trading_algorithmique.egg-info/PKG-INFO
+src/trading_algorithmique.egg-info/SOURCES.txt
+src/trading_algorithmique.egg-info/dependency_links.txt
+src/trading_algorithmique.egg-info/requires.txt
+src/trading_algorithmique.egg-info/top_level.txt

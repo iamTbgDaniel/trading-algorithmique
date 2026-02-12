@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: trading-algorithmique
+Version: 0.1.0
+Summary: Pipeline de trading algorithmique (data, features, backtesting, risk, ingestion MT5)
+Requires-Python: >=3.11
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: pyyaml
+Requires-Dist: pytest
+Requires-Dist: MetaTrader5
+Requires-Dist: pytz
