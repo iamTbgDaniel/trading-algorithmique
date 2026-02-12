@@ -6,6 +6,8 @@ from src.trading.features.indicators import add_moving_average
 from src.trading.backtesting.engine import run_backtest
 from src.trading.evaluation.metrics import summarize
 from src.trading.risk.manager import enforce_risk_limits
+from src.trading.data.resample import aggregate_ohlcv
+from src.trading.features.regime import add_trend_filter
 
 
 def main():
@@ -13,14 +15,26 @@ def main():
 
     df = load_csv(cfg["data_path"])
     df = add_moving_average(df, cfg["features"]["ma_window"])
+    context_filter = None
 
+    if cfg.get("multi_tf", {}).get("enabled", False):
+        n = cfg["multi_tf"]["context_agg_n"]
+        context = aggregate_ohlcv(df, n=n)
+        context = add_trend_filter(context, ma_window=cfg["multi_tf"]["context_ma_window"])
+
+        # On projette le trend contexte sur l'exécution en répétant chaque valeur n fois
+        context_filter = context["trend"].repeat(n).reset_index(drop=True)
+    
+    print("context_filter (10 premières):", None if context_filter is None else context_filter.head(10).tolist())
     df = run_backtest(
         df,
         initial_capital=cfg["backtest"]["initial_capital"],
         commission_per_trade=cfg["backtest"]["commission_per_trade"],
         slippage_bps=cfg["backtest"]["slippage_bps"],
         spread_bps=cfg["backtest"]["spread_bps"],
+        context_filter=context_filter,
     )
+    print(df[["close", "ma_3", "context_ok", "position"]].head(10))
 
     # 1) Stats de performance
     stats = summarize(df)
