@@ -1,7 +1,19 @@
-data_path: "data/samples/sample.csv"
+data_path: "data/raw/STEP200/M5.csv"
 
 features:
-  ma_window: 3
+  ma_window: 10   # MA sur M5 (exécution)
 
 backtest:
-  initial_capital: 1.0   # equity commence à 1
+  initial_capital: 1.0
+  commission_per_trade: 0.0002
+  slippage_bps: 2
+  spread_bps: 5
+
+risk:
+  max_trades: 500
+  max_drawdown: -0.20
+
+multi_tf:
+  enabled: true
+  rules: ["4h", "1h", "30min", "15min"]  # contexte
+  context_ma_window: 10

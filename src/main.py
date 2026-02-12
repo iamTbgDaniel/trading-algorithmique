@@ -6,26 +6,43 @@ from src.trading.features.indicators import add_moving_average
 from src.trading.backtesting.engine import run_backtest
 from src.trading.evaluation.metrics import summarize
 from src.trading.risk.manager import enforce_risk_limits
-from src.trading.data.resample import aggregate_ohlcv
+
+from src.trading.data.resample import resample_ohlcv
+from src.trading.features.align import align_context_to_execution
 from src.trading.features.regime import add_trend_filter
 
 
 def main():
     cfg = load_config("configs/default.yaml")
 
+    # 1) Charger données MT5 (M5)
     df = load_csv(cfg["data_path"])
-    df = add_moving_average(df, cfg["features"]["ma_window"])
+
+    # 2) Feature d’exécution sur M5
+    exec_ma_window = cfg["features"]["ma_window"]
+    df = add_moving_average(df, exec_ma_window)
+
+    # 3) Multi-timeframe : H4 -> H1 -> M30 -> M15 (filtre), exécution M5
     context_filter = None
-
     if cfg.get("multi_tf", {}).get("enabled", False):
-        n = cfg["multi_tf"]["context_agg_n"]
-        context = aggregate_ohlcv(df, n=n)
-        context = add_trend_filter(context, ma_window=cfg["multi_tf"]["context_ma_window"])
+        rules = cfg["multi_tf"]["rules"]                 # ["4H","1H","30min","15min"]
+        context_ma = cfg["multi_tf"]["context_ma_window"]
 
-        # On projette le trend contexte sur l'exécution en répétant chaque valeur n fois
-        context_filter = context["trend"].repeat(n).reset_index(drop=True)
-    
+        combined = None
+        for rule in rules:
+            ctx = resample_ohlcv(df, rule=rule)
+            ctx = add_trend_filter(ctx, ma_window=context_ma)
+            aligned = align_context_to_execution(df, ctx)  # 0/1 sur M5
+            combined = aligned if combined is None else (combined & aligned)
+
+        context_filter = combined
+
+    # Debug optionnel (tu peux enlever après)
     print("context_filter (10 premières):", None if context_filter is None else context_filter.head(10).tolist())
+    if context_filter is not None:
+        print("context_filter (10 dernières):", context_filter.tail(10).tolist())
+
+    # 4) Backtest
     df = run_backtest(
         df,
         initial_capital=cfg["backtest"]["initial_capital"],
@@ -33,16 +50,22 @@ def main():
         slippage_bps=cfg["backtest"]["slippage_bps"],
         spread_bps=cfg["backtest"]["spread_bps"],
         context_filter=context_filter,
+        exec_ma_window=exec_ma_window,
     )
-    print(df[["close", "ma_3", "context_ok", "position"]].head(10))
+    print("Nombre de trades (proxy):", int(df["position"].diff().abs().fillna(0).sum()))
+    print("Proportion context_ok=1:", float(df["context_ok"].mean()))
 
-    # 1) Stats de performance
+    # Debug cohérent (ma dynamique)
+    ma_col = f"ma_{exec_ma_window}"
+    print(df[["close", ma_col, "context_ok", "position"]].head(10))
+
+    # 5) Stats
     stats = summarize(df)
     print("=== STATS BACKTEST ===")
     for k, v in stats.items():
         print(f"{k}: {v}")
 
-    # 2) Contrôle de risque
+    # 6) Risk
     risk = enforce_risk_limits(
         df,
         max_trades=cfg["risk"]["max_trades"],
@@ -52,7 +75,7 @@ def main():
     for k, v in risk.items():
         print(f"{k}: {v}")
 
-    # 3) Plot
+    # 7) Plot
     plt.plot(df["equity"])
     plt.title("Equity Curve")
     plt.show()
