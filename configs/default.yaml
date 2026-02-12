@@ -1,0 +1,7 @@
+data_path: "data/samples/sample.csv"
+
+features:
+  ma_window: 3
+
+backtest:
+  initial_capital: 1.0   # equity commence à 1
